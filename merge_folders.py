@@ -217,11 +217,7 @@ def changetext(text): # Clear the output text and replace with given string
     root.update_idletasks()    
 
 def loadingtext(text): # Clear the loading text and replace with given string
-
-    loading_text.set('                                                       ' +
-                     '                                                       ' +
-                     '                                                       ' )
-    root.update_idletasks()
+    
     loading_text.set(str(text))
     root.update_idletasks() 
 
