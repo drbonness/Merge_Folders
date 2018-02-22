@@ -8,6 +8,7 @@ import filecmp
 import shutil
 from threading import Thread
 import pyautogui
+import itertools
 
 # Path Functions
 
@@ -62,8 +63,9 @@ if(os.path.isfile(config_filename)):   # check it's a file
 top_level = []
 
 def start_threading():
-    Thread(target=get_top_level).start()
-    Thread(target=loading).start()
+    #Thread(target=get_top_level).start()
+    get_top_level()
+    #Thread(target=loading).start()
             
 def get_top_level():
 
@@ -76,16 +78,19 @@ def get_top_level():
     if os.path.isdir(master):
         # Save the names of our root folders, and make full paths out of them
         root_names = os.listdir(master) # = ['1', '2', '3',...]
-        for i in range(len(root_names)):
-            top_level[i] = os.path.join(master, root_names[i])
+        for item in root_names:
+            if not item.startswith('.') and os.path.isdir(os.path.join(master, item)):
+                top_level.append(os.path.join(master, item))
 
-        # Copy the first root folder and append it to the top_level list
+        # Copy the first root folder (dir1) and append it to the top_level list
         shutil.copytree(top_level[0], os.path.join(master, 'Merge'))
         top_level.append(os.path.join(master, 'Merge'))
 
         # Merge all folders, beginning with entries 1 and -1
-        for rootnum in range(1, len(top_level)):
-            merge(top_level[-1], top_level[rootnum])
+        # Because 'Merge' is appended to top_level (increasing its size by 1)
+        # iterate from 1 (dir2) to len(top_level) - 1
+        for rootnum in range(1, len(top_level) - 1):
+            merge(top_level[-1], top_level[rootnum], rootnum)
 
         stoploading = True
         
@@ -108,7 +113,7 @@ def get_top_level():
         print('Merging completed in %s' % (elapsed_time))
 
 # Takes two inputs: First directory (future master) and directory to compare
-def merge(dir1, dir2):
+def merge(dir1, dir2, rootnum):
 
     # Alert user to current activity
     changetext('Current Directory:\n' + shortenPath(dir2))    
@@ -118,7 +123,7 @@ def merge(dir1, dir2):
     ''' STEP 1: Copy over unique files/folders '''               
     for item in compared.right_only: # Everything unique to dir2 (by name)
         
-        if os.path.isfile(os.path.join(dir2, file)): # Unique files
+        if os.path.isfile(os.path.join(dir2, item)): # Unique files
             print('%s found in %s.' % (item, top_level[1]))
             # Copy all of them over to dest directory
             shutil.copyfile(os.path.join(dir2, item), os.path.join(dir1, item))
@@ -161,7 +166,7 @@ def merge(dir1, dir2):
                 suspect_matches.append(dir1_renamed[index])
                 
             suspect_pairs = []
-            for pair in combinations(suspect_matches, 2): # Generate list of tuples
+            for pair in itertools.combinations(suspect_matches, 2): # Generate list of tuples
                 suspect_pairs.append(pair)
 
             for n in range(len(suspect_pairs)): # Compare each pair
@@ -179,7 +184,7 @@ def merge(dir1, dir2):
     for folder in compared.common_dirs: # All folders that appear in both dirs
 
         # Dive into each one and start over
-        merge(os.path.join(dir1, folder), os.path.join(dir2, folder))
+        merge(os.path.join(dir1, folder), os.path.join(dir2, folder), rootnum)
 
 def rename(filename, suffix): # Ex: filename = butts.txt, suffix = '_1'
 
@@ -208,17 +213,11 @@ def strip(filelist): # Remove '_n'
     return stripped # = 'blahblah.txt'
         
 def changetext(text): # Clear the output text and replace with given string
-    
-    output_text.set('                                                       ' +
-                    '                                                       ' +
-                    '                                                       ' )
-    root.update_idletasks()
     output_text.set(str(text))
     root.update_idletasks()    
 
 def loadingtext(text): # Clear the loading text and replace with given string
-    
-    loading_text.set(str(text))
+    progress_text.set(str(text))
     root.update_idletasks() 
 
 ################################ Testing Zone ##################################
@@ -290,10 +289,10 @@ def test():
 # Tkinter GUI 
 
 root = Tk()
-root.title("Merge Folders 0.6")
-root.geometry("400x240")
+root.title("Merge Folders")
+root.geometry("400x250")
+root.grid_columnconfigure(1, weight=1)
 
-dir_text = str
 path_display = [StringVar()]
 dir_location = [""]
 
@@ -303,32 +302,27 @@ except:
     pass
 
 output_text = StringVar()
-loading_text = StringVar()
+progress_text = StringVar()
 
 path_button = Button(root, text="Choose Path", command=lambda : choosePath(0))
+merge_button = Button(root, text="Merge Directories", command=lambda : get_top_level(), font=("TkDefaultFont",16))
+test_button = Button(root, text="Test", command=lambda : test(), font=("TkDefaultFont",16))
 
-merge_button = Button(root, text="Merge Directories",
-                      command=lambda : start_threading(), font=("TkDefaultFont",16))
-test_button = Button(root, text="Test",
-                      command=lambda : test(), font=("TkDefaultFont",16))
-
-Label(root,text="File Copy Verification",
-      font=("TkDefaultFont",20)).place(x=65, y=5)
-
-Label(root,text="Directory:",
-      font=("TkDefaultFont",16)).place(x=20, y=45)
+Label(root,text="Merge Folders",font=("TkDefaultFont",20)).grid(row=0, columnspan = 2)
+Label(root,text="Directory:",font=("TkDefaultFont",16)).grid(row=1, sticky=W)
 
 path_label = Label(root, textvariable=path_display[0],anchor=E)
 path_label.config(relief="solid",borderwidth=1)
 
 output_label = Label(root, textvariable=output_text)
-loading_label = Label(root, textvariable=loading_text)
+progress_label = Label(root, textvariable=progress_text)
 
-path_button.place(  x=25,   y=75    )
-merge_button.place( x=40,   y=115   )
-test_button.place(  x=260,  y=115   )
-path_label.place(   x=125,  y=52    )
-output_label.place( x=35,   y=170   )
-loading_label.place(x=120,  y=78    )
+path_button.grid(row=2)
+merge_button.grid(row=3,columnspan=2,pady=10)
+test_button.grid(row=4,columnspan=2,pady=0)
+
+path_label.grid(row=2,column=1,padx=5,sticky=EW)
+output_label.grid(row=5,columnspan=2)
+progress_label.grid(row=6,columnspan=2)
 
 root.mainloop()
